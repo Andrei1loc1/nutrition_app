@@ -1,0 +1,168 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum MealType {
+  BREAKFAST
+  LUNCH
+  DINNER
+  SNACK
+  OTHER
+}
+
+enum PortionSize {
+  SMALL
+  MEDIUM
+  LARGE
+  FULL
+  CUSTOM
+}
+
+enum ScanStatus {
+  DRAFT
+  ADDED_TO_JOURNAL
+  DISCARDED
+}
+
+enum ReportType {
+  DAILY
+  WEEKLY
+  MONTHLY
+  CUSTOM
+}
+
+model User {
+  id           String   @id @default(cuid())
+  displayName  String   @unique
+  createdAt    DateTime @default(now())
+  scans        Scan[]
+  meals        Meal[]
+  reports      ReportSnapshot[]
+
+  @@map("users")
+}
+
+model Food {
+  id               String     @id @default(cuid())
+  slug             String     @unique
+  name             String
+  calories         Decimal    @db.Decimal(8, 2)
+  proteinGrams     Decimal    @db.Decimal(8, 2)
+  carbsGrams       Decimal    @db.Decimal(8, 2)
+  fatGrams         Decimal    @db.Decimal(8, 2)
+  servingLabel     String     @default("medium")
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  scans            Scan[]
+  mealItems        MealItem[]
+
+  @@index([slug])
+}
+
+model Scan {
+  id               String      @id @default(cuid())
+  userId           String?
+  user             User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  foodId           String?
+  food             Food?       @relation(fields: [foodId], references: [id], onDelete: SetNull)
+  imageId          String?     @unique
+  image            ScanImage?  @relation(fields: [imageId], references: [id], onDelete: SetNull)
+  predictedLabel   String
+  displayName      String
+  confidence       Decimal     @db.Decimal(5, 2)
+  portionSize      PortionSize @default(MEDIUM)
+  portionLabel     String?
+  calories         Decimal     @db.Decimal(8, 2)
+  proteinGrams     Decimal     @db.Decimal(8, 2)
+  carbsGrams       Decimal     @db.Decimal(8, 2)
+  fatGrams         Decimal     @db.Decimal(8, 2)
+  status           ScanStatus  @default(DRAFT)
+  rawPrediction    Json?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  meals            Meal[]
+
+  @@index([createdAt])
+  @@index([status, createdAt])
+  @@index([foodId])
+  @@index([userId])
+}
+
+model ScanImage {
+  id          String   @id @default(cuid())
+  url         String
+  mimeType    String?
+  sizeBytes   Int?
+  width       Int?
+  height      Int?
+  createdAt   DateTime @default(now())
+  scan        Scan?
+}
+
+model Meal {
+  id            String     @id @default(cuid())
+  userId        String?
+  user          User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  sourceScanId  String?
+  sourceScan    Scan?      @relation(fields: [sourceScanId], references: [id], onDelete: SetNull)
+  mealType      MealType   @default(OTHER)
+  loggedAt      DateTime   @default(now())
+  title         String
+  notes         String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  items         MealItem[]
+
+  @@index([loggedAt])
+  @@index([mealType, loggedAt])
+  @@index([sourceScanId])
+  @@index([userId])
+}
+
+model MealItem {
+  id               String      @id @default(cuid())
+  mealId           String
+  meal             Meal        @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  foodId           String?
+  food             Food?       @relation(fields: [foodId], references: [id], onDelete: SetNull)
+  name             String
+  quantity         Decimal     @default(1) @db.Decimal(8, 2)
+  portionSize      PortionSize @default(MEDIUM)
+  portionLabel     String?
+  calories         Decimal     @db.Decimal(8, 2)
+  proteinGrams     Decimal     @db.Decimal(8, 2)
+  carbsGrams       Decimal     @db.Decimal(8, 2)
+  fatGrams         Decimal     @db.Decimal(8, 2)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  @@index([mealId])
+  @@index([foodId])
+}
+
+model ReportSnapshot {
+  id                 String     @id @default(cuid())
+  userId             String?
+  user               User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  type               ReportType
+  title              String
+  rangeStart         DateTime
+  rangeEnd           DateTime
+  totalCalories      Decimal    @db.Decimal(10, 2)
+  totalProteinGrams  Decimal    @db.Decimal(10, 2)
+  totalCarbsGrams    Decimal    @db.Decimal(10, 2)
+  totalFatGrams      Decimal    @db.Decimal(10, 2)
+  mealCount          Int
+  recommendations    Json?
+  snapshot           Json?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  @@index([type, rangeStart, rangeEnd])
+  @@index([createdAt])
+  @@index([userId])
+}
